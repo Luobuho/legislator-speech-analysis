@@ -1,0 +1,459 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>立法委員主題分析系統</title>
+    <link rel="stylesheet" href="styles.css">
+
+</head>
+
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🏛️ 立法委員主題分析系統</h1>
+            <p>基於BERTopic深度分析立法委員發言主題與影響力</p>
+            <div id="status-indicator" style="margin-top: 15px; padding: 10px; border-radius: 8px; display: none;">
+                <span id="status-text"></span>
+            </div>
+        </div>
+
+        <div class="nav-tabs">
+            <button class="nav-tab active" data-tab="legislator-topic">立委主題匹配</button>
+            <button class="nav-tab" data-tab="topic-legislator">主題立委匹配</button>
+            <button class="nav-tab" data-tab="party-topic">黨派主題分析</button>
+            <button class="nav-tab" data-tab="district-topic">選區原籍分析</button>
+            <button class="nav-tab" data-tab="correlation">相關性計算</button>
+            <button class="nav-tab" data-tab="influence">影響力分析</button>
+            <button class="nav-tab" data-tab="community">社群分析</button>
+            <button class="nav-tab" data-tab="visualization">可視化分析</button>
+        </div>
+
+        <!-- 立委主題匹配面板 -->
+        <div class="content-panel active" id="legislator-topic">
+            <h2>🧑‍💼 立委主題匹配分析</h2>
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-number" id="total-legislators">-</div>
+                    <div class="stat-label">總立委數</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number" id="total-topics">-</div>
+                    <div class="stat-label">總主題數</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number" id="avg-topics-per-legislator">-</div>
+                    <div class="stat-label">平均關注主題數</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number" id="total-interactions">-</div>
+                    <div class="stat-label">總關聯數</div>
+                </div>
+            </div>
+
+            <div class="search-container">
+                <input type="text" class="search-input" id="legislator-search" placeholder="搜尋立委姓名...">
+                <select class="filter-select" id="party-filter">
+                    <option value="">所有政黨</option>
+                </select>
+                <button class="btn" onclick="filterLegislatorData()">搜尋</button>
+                <button class="btn btn-secondary" onclick="resetLegislatorFilters()">重置</button>
+            </div>
+
+            <div class="table-container">
+                <table class="data-table" id="legislator-topic-table">
+                    <thead>
+                        <tr>
+                            <th class="sortable" data-sort="name">立委姓名</th>
+                            <th class="sortable" data-sort="party">政黨</th>
+                            <th class="sortable" data-sort="actualTopicCount">實際關注主題數</th>
+                            <th class="sortable" data-sort="totalScore">總關心度</th>
+                            <th class="sortable" data-sort="avgScore">平均關心度</th>
+                            <th>前十大主題</th>
+                            <th>完整主題清單</th>
+                        </tr>
+                    </thead>
+                    <tbody id="legislator-topic-tbody">
+                        <tr>
+                            <td colspan="7" class="loading">載入數據中...</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- 主題立委匹配面板 -->
+        <div class="content-panel" id="topic-legislator">
+            <h2>📋 主題立委匹配分析</h2>
+
+            <div class="search-container">
+                <input type="text" class="search-input" id="topic-search" placeholder="搜尋主題關鍵詞...">
+                <select class="filter-select" id="topic-filter">
+                    <option value="">所有主題</option>
+                </select>
+                <button class="btn" onclick="filterTopicData()">搜尋</button>
+                <button class="btn btn-secondary" onclick="resetTopicFilters()">重置</button>
+            </div>
+
+            <div class="table-container">
+                <table class="data-table" id="topic-legislator-table">
+                    <thead>
+                        <tr>
+                            <th class="sortable" data-sort="topicId">主題ID</th>
+                            <th>關鍵詞</th>
+                            <th class="sortable" data-sort="legislatorCount">關注立委數</th>
+                            <th class="sortable" data-sort="totalScore">總關心度</th>
+                            <th class="sortable" data-sort="avgScore">平均關心度</th>
+                            <th>全部關注立委</th>
+                            <th>前十大關注立委</th>
+                        </tr>
+                    </thead>
+                    <tbody id="topic-legislator-tbody">
+                        <tr>
+                            <td colspan="7" class="loading">載入數據中...</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- 黨派主題分析面板 -->
+        <div class="content-panel" id="party-topic">
+            <h2>🏛️ 黨派主題分析</h2>
+
+            <div class="table-container">
+                <table class="data-table" id="party-topic-table">
+                    <thead>
+                        <tr>
+                            <th>政黨</th>
+                            <th class="sortable" data-sort="memberCount">立委數</th>
+                            <th class="sortable" data-sort="totalEngagement">總參與度</th>
+                            <th class="sortable" data-sort="avgEngagement">平均參與度</th>
+                            <th>前十大關注主題</th>
+                        </tr>
+                    </thead>
+                    <tbody id="party-topic-tbody">
+                        <tr>
+                            <td colspan="5" class="loading">載入數據中...</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- 選區原籍分析面板 -->
+        <div class="content-panel" id="district-topic">
+            <h2>📍 選區原籍分析</h2>
+
+            <div class="search-container">
+                <input type="text" class="search-input" id="district-search" placeholder="搜尋選區或原籍地...">
+                <select class="filter-select" id="analysis-type">
+                    <option value="district">按選區分析</option>
+                    <option value="origin">按原籍地分析</option>
+                </select>
+                <button class="btn" onclick="filterDistrictData()">搜尋</button>
+                <button class="btn btn-secondary" onclick="resetDistrictFilters()">重置</button>
+            </div>
+
+            <div class="table-container">
+                <table class="data-table" id="district-topic-table">
+                    <thead>
+                        <tr>
+                            <th class="sortable" data-sort="name">選區/原籍地</th>
+                            <th>類型</th>
+                            <th class="sortable" data-sort="legislatorCount">立委數</th>
+                            <th class="sortable" data-sort="topicDiversity">主題多樣性</th>
+                            <th class="sortable" data-sort="totalActivity">總活躍度</th>
+                            <th>前十大關注主題</th>
+                        </tr>
+                    </thead>
+                    <tbody id="district-topic-tbody">
+                        <tr>
+                            <td colspan="6" class="loading">分析中...</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- 相關性計算面板 -->
+        <div class="content-panel" id="correlation">
+            <h2>📊 相關性計算分析</h2>
+
+            <div class="correlation-sub-tabs">
+                <button class="correlation-sub-tab active" data-subtab="topic-scores">立委主題分數計算</button>
+                <button class="correlation-sub-tab" data-subtab="comprehensive-stats">立委綜合評分</button>
+            </div>
+
+            <!-- 立委主題分數計算子面板 -->
+            <div class="correlation-sub-panel active" id="topic-scores">
+                <div class="indicator-explanation">
+                    <h3>📋 主題分數指標說明</h3>
+                    <div class="indicator-list">
+                        <div class="indicator-item">
+                            <h4>直接發言次數</h4>
+                            <p>立委被直接分配到該主題的發言次數，反映立委對該主題的直接參與程度。數值越高表示該立委在此主題上有更多直接發言。</p>
+                        </div>
+                        <div class="indicator-item">
+                            <h4>低/中/高相關發言次數</h4>
+                            <p>根據BERTopic機率分布計算，立委發言與該主題的相關性程度分層統計。基於動態閾值設定：低相關>0.005、中相關>0.01、高相關>0.02。</p>
+                        </div>
+                        <div class="indicator-item">
+                            <h4>平均相關性</h4>
+                            <p>立委所有發言對該主題的平均機率分數，反映整體關聯強度。數值範圍0-1，越接近1表示關聯性越強。</p>
+                        </div>
+                        <div class="indicator-item">
+                            <h4>最大相關性</h4>
+                            <p>立委在該主題上的最高單次發言相關性分數，反映立委在此主題上的最佳表現。</p>
+                        </div>
+                        <div class="indicator-item">
+                            <h4>總相關性</h4>
+                            <p>立委所有發言對該主題的相關性分數總和，綜合反映立委對該主題的整體投入程度。</p>
+                        </div>
+                        <div class="indicator-item">
+                            <h4>最終關心度評分 (標準化)</h4>
+                            <p>綜合計算公式：基礎關心度(直接發言×2) + 加權關心度(總相關性×1) + 質量加分(高相關發言×0.5)。已標準化為100分制便於比較。</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="search-container">
+                    <select class="filter-select" id="legislator-selector" style="min-width: 200px;">
+                        <option value="">請選擇立委</option>
+                    </select>
+                    <select class="filter-select" id="topic-selector" style="min-width: 150px;" disabled>
+                        <option value="">請先選擇立委</option>
+                    </select>
+                    <button class="btn" onclick="loadSelectedLegislatorTopicData()" id="load-topic-data-btn"
+                        disabled>查看數據</button>
+                    <button class="btn btn-secondary" onclick="resetTopicScoresSelection()">重置</button>
+                </div>
+
+                <div id="selected-legislator-info"
+                    style="display: none; margin-bottom: 20px; padding: 15px; background: #f8f9fa; border-radius: 8px;">
+                    <h4 id="selected-legislator-name"></h4>
+                    <p id="selected-legislator-party"></p>
+                </div>
+
+                <div class="table-container">
+                    <table class="data-table" id="topic-scores-table">
+                        <thead>
+                            <tr>
+                                <th>主題ID</th>
+                                <th>主題關鍵詞</th>
+                                <th class="sortable" data-sort="directSpeeches">直接發言次數</th>
+                                <th class="sortable" data-sort="lowRelevance">低相關發言次數</th>
+                                <th class="sortable" data-sort="midRelevance">中相關發言次數</th>
+                                <th class="sortable" data-sort="highRelevance">高相關發言次數</th>
+                                <th class="sortable" data-sort="avgRelevance">平均相關性</th>
+                                <th class="sortable" data-sort="maxRelevance">最大相關性</th>
+                                <th class="sortable" data-sort="totalRelevance">總相關性</th>
+                                <th class="sortable" data-sort="finalScore">最終關心度評分</th>
+                            </tr>
+                        </thead>
+                        <tbody id="topic-scores-tbody">
+                            <tr>
+                                <td colspan="10" class="loading">請選擇立委查看其主題分數</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- 立委綜合評分子面板 -->
+            <div class="correlation-sub-panel" id="comprehensive-stats">
+                <div class="indicator-explanation">
+                    <h3>🏆 綜合評分指標說明</h3>
+                    <div class="indicator-list">
+                        <div class="indicator-item">
+                            <h4>總最終關心度 (標準化)</h4>
+                            <p>立委在所有主題上的最終關心度評分總和，反映立委的整體活躍程度和影響力。已標準化為100分制。</p>
+                        </div>
+                        <div class="indicator-item">
+                            <h4>平均最終關心度 (標準化)</h4>
+                            <p>總最終關心度除以關注主題數，反映立委平均每個主題的投入程度。標準化後便於跨立委比較。</p>
+                        </div>
+                        <div class="indicator-item">
+                            <h4>關注主題數</h4>
+                            <p>立委實際關注的主題總數，反映立委關注議題的廣度。數值越高表示立委涉獵範圍越廣。</p>
+                        </div>
+                        <div class="indicator-item">
+                            <h4>專業度 (標準化)</h4>
+                            <p>總最終關心度除以關注主題數，衡量立委的專精程度。高專業度表示立委在少數主題上有深度投入。</p>
+                        </div>
+                        <div class="indicator-item">
+                            <h4>發言效率 (標準化)</h4>
+                            <p>總最終關心度除以總發言次數，反映立委發言的質量效率。高效率表示立委發言更有針對性和影響力。</p>
+                        </div>
+                        <div class="indicator-item">
+                            <h4>總發言次數</h4>
+                            <p>立委在所有主題上的發言總數，反映立委的整體發言活躍度。</p>
+                        </div>
+                        <div class="indicator-item">
+                            <h4>平均相關性</h4>
+                            <p>立委所有發言的平均主題相關性分數，反映發言與所討論主題的整體契合度。</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="search-container">
+                    <input type="text" class="search-input" id="comprehensive-search" placeholder="搜尋立委姓名...">
+                    <select class="filter-select" id="comprehensive-party-filter">
+                        <option value="">所有政黨</option>
+                    </select>
+                    <button class="btn" onclick="filterComprehensiveData()">搜尋</button>
+                    <button class="btn btn-secondary" onclick="resetComprehensiveFilters()">重置</button>
+                </div>
+
+                <div class="table-container">
+                    <table class="data-table" id="comprehensive-stats-table">
+                        <thead>
+                            <tr>
+                                <th class="sortable" data-sort="legislator">立委姓名</th>
+                                <th class="sortable" data-sort="party">政黨</th>
+                                <th class="sortable" data-sort="totalFinalScore">總最終關心度</th>
+                                <th class="sortable" data-sort="avgFinalScore">平均最終關心度</th>
+                                <th class="sortable" data-sort="topicCount">關注主題數</th>
+                                <th class="sortable" data-sort="specialization">專業度</th>
+                                <th class="sortable" data-sort="efficiency">發言效率</th>
+                                <th class="sortable" data-sort="totalSpeeches">總發言次數</th>
+                                <th class="sortable" data-sort="avgRelevance">平均相關性</th>
+                            </tr>
+                        </thead>
+                        <tbody id="comprehensive-stats-tbody">
+                            <tr>
+                                <td colspan="9" class="loading">載入數據中...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- 影響力分析面板 -->
+        <div class="content-panel" id="influence">
+            <h2>📊 影響力分析</h2>
+
+            <div class="search-container">
+                <input type="text" class="search-input" id="influence-search" placeholder="搜尋立委...">
+                <select class="filter-select" id="influence-metric">
+                    <option value="degree">度中心性</option>
+                    <option value="weighted_degree">加權度中心性</option>
+                    <option value="betweenness">介數中心性</option>
+                    <option value="leaderrank">LeaderRank</option>
+                    <option value="eigenvector">特徵向量中心性</option>
+                </select>
+                <button class="btn" onclick="filterInfluenceData()">搜尋</button>
+                <button class="btn btn-secondary" onclick="resetInfluenceFilters()">重置</button>
+            </div>
+
+            <div class="table-container">
+                <table class="data-table" id="influence-table">
+                    <thead>
+                        <tr>
+                            <th class="sortable" data-sort="name">立委姓名</th>
+                            <th>政黨</th>
+                            <th class="sortable" data-sort="degree">度中心性</th>
+                            <th class="sortable" data-sort="weighted_degree">加權度中心性</th>
+                            <th class="sortable" data-sort="betweenness">介數中心性</th>
+                            <th class="sortable" data-sort="leaderrank">LeaderRank</th>
+                            <th class="sortable" data-sort="eigenvector">特徵向量中心性</th>
+                            <th class="sortable" data-sort="core">核數</th>
+                        </tr>
+                    </thead>
+                    <tbody id="influence-tbody">
+                        <tr>
+                            <td colspan="8" class="loading">載入數據中...</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- 可視化分析面板 -->
+        <div class="content-panel" id="visualization">
+            <h2>📊 可視化分析</h2>
+
+            <div class="search-container">
+                <select class="filter-select" id="viz-type">
+                    <option value="specialization">立委專業度分析</option>
+                    <option value="topic-overview">主題概覽</option>
+                </select>
+                <button class="btn" onclick="loadVisualization()">載入可視化</button>
+            </div>
+
+            <div id="visualization-container">
+                <div class="viz-placeholder">
+                    <h3>📈 互動式可視化分析</h3>
+                    <p>選擇可視化類型並點擊載入</p>
+                    <div style="margin-top: 20px;">
+                        <div style="padding: 15px; background: white; border-radius: 8px; margin: 10px 0;">
+                            <h4>🎯 立委專業度分析</h4>
+                            <p>以氣泡圖顯示立委的專業度與涉獵廣度關係</p>
+                        </div>
+                        <div style="padding: 15px; background: white; border-radius: 8px; margin: 10px 0;">
+                            <h4>🗂️ 主題概覽</h4>
+                            <p>主題分布和關聯性的互動式視覺化</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 社群分析面板 -->
+        <div class="content-panel" id="community">
+            <h2>👥 Louvain社群分析</h2>
+
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-number" id="total-communities">-</div>
+                    <div class="stat-label">社群數量</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number" id="largest-community">-</div>
+                    <div class="stat-label">最大社群規模</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number" id="avg-community-size">-</div>
+                    <div class="stat-label">平均社群規模</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number" id="modularity">-</div>
+                    <div class="stat-label">模組性指標</div>
+                </div>
+            </div>
+
+            <div class="table-container">
+                <table class="data-table" id="community-table">
+                    <thead>
+                        <tr>
+                            <th class="sortable" data-sort="community">社群ID</th>
+                            <th class="sortable" data-sort="size">規模</th>
+                            <th class="sortable" data-sort="density">密度</th>
+                            <th>主要政黨</th>
+                            <th>成員立委</th>
+                            <th>共同關注主題</th>
+                        </tr>
+                    </thead>
+                    <tbody id="community-tbody">
+                        <tr>
+                            <td colspan="6" class="loading">載入數據中...</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <div class="export-section">
+            <h3>📥 數據導出</h3>
+            <button class="btn" onclick="exportCurrentData()">導出當前視圖數據</button>
+            <button class="btn btn-secondary" onclick="exportAllData()">導出所有數據</button>
+        </div>
+    </div>
+
+
+    <script src="script.js"></script>
+</body>
+
+</html>
