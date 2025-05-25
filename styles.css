@@ -162,11 +162,14 @@ body {
     font-size: 1.3em;
     border-bottom: 2px solid #007bff;
     padding-bottom: 8px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
 }
 
 .indicator-list {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
     gap: 15px;
 }
 
@@ -176,18 +179,26 @@ body {
     border-radius: 8px;
     border-left: 4px solid #007bff;
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+    transition: all 0.3s ease;
+}
+
+.indicator-item:hover {
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+    transform: translateY(-2px);
 }
 
 .indicator-item h4 {
     color: #007bff;
     margin-bottom: 8px;
     font-size: 1.1em;
+    font-weight: bold;
 }
 
 .indicator-item p {
     color: #6c757d;
     font-size: 0.95em;
-    line-height: 1.5;
+    line-height: 1.6;
+    margin: 0;
 }
 
 .score-normalized {
@@ -203,6 +214,43 @@ body {
 .score-original {
     color: #6c757d;
     font-size: 0.9em;
+}
+
+/* 會議加權分數樣式 */
+.meeting-weighted-score {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+}
+
+.meeting-count {
+    font-size: 12px;
+    color: #6c757d;
+    background: #f8f9fa;
+    padding: 2px 6px;
+    border-radius: 4px;
+    white-space: nowrap;
+}
+
+/* 社群分析方法控制區域樣式 */
+.community-method-controls {
+    background: #f8f9fa;
+    border: 1px solid #dee2e6;
+    border-radius: 10px;
+    padding: 20px;
+    margin-bottom: 20px;
+}
+
+.community-method-controls ul {
+    margin: 5px 0;
+    padding-left: 20px;
+    color: #666;
+    font-size: 16px;
+}
+
+.community-method-controls li {
+    margin-bottom: 5px;
 }
 
 .search-container {
@@ -533,6 +581,31 @@ body {
     min-width: 300px;
 }
 
+/* 影響力分析表格樣式調整 */
+#influence-table th:nth-child(5),
+#influence-table th:nth-child(6),
+#influence-table th:nth-child(7),
+#influence-table th:nth-child(8) {
+    min-width: 140px;
+    text-align: center;
+}
+
+#influence-table td:nth-child(5),
+#influence-table td:nth-child(6),
+#influence-table td:nth-child(7),
+#influence-table td:nth-child(8) {
+    min-width: 140px;
+    text-align: center;
+}
+
+/* 社群表格新增分群方法欄位樣式 */
+#community-table th:nth-child(2),
+#community-table td:nth-child(2) {
+    min-width: 120px;
+    text-align: center;
+    font-weight: bold;
+}
+
 #visualization-container {
     width: 100%;
     height: 80vh;
@@ -616,6 +689,13 @@ body {
     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
 }
 
+/* 響應式設計優化 */
+@media (max-width: 1200px) {
+    .indicator-list {
+        grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    }
+}
+
 @media (max-width: 768px) {
     .container {
         padding: 10px;
@@ -643,5 +723,25 @@ body {
 
     .keywords {
         max-width: none;
+    }
+    
+    .indicator-list {
+        grid-template-columns: 1fr;
+    }
+    
+    .community-method-controls {
+        padding: 15px;
+    }
+    
+    .community-method-controls div:first-child {
+        font-size: 16px;
+    }
+    
+    .meeting-weighted-score {
+        font-size: 14px;
+    }
+    
+    .meeting-count {
+        font-size: 10px;
     }
 }

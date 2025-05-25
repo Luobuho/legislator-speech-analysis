@@ -197,7 +197,8 @@
                         </div>
                         <div class="indicator-item">
                             <h4>低/中/高相關發言次數</h4>
-                            <p>根據BERTopic機率分布計算，立委發言與該主題的相關性程度分層統計。基於動態閾值設定：低相關>0.005、中相關>0.01、高相關>0.02。</p>
+                            <p>根據BERTopic機率分布計算，立委發言與該主題的相關性程度分層統計。閾值設定：低相關 > 平均相關性 + 1.0×標準差、中相關 > 平均相關性 + 2.0×標準差、高相關
+                                > 平均相關性 + 3.0×標準差。這些閾值會根據實際數據分布動態調整，確保只選擇真正突出的關聯。</p>
                         </div>
                         <div class="indicator-item">
                             <h4>平均相關性</h4>
@@ -276,7 +277,8 @@
                         </div>
                         <div class="indicator-item">
                             <h4>關注主題數</h4>
-                            <p>立委實際關注的主題總數，反映立委關注議題的廣度。數值越高表示立委涉獵範圍越廣。</p>
+                            <p>立委實際關注的主題總數，反映立委關注議題的廣度。計算標準：立委對某主題有直接發言，或有高相關發言，或有2個以上中相關發言且平均相關性超過中閾值，或有5個以上低相關發言且平均相關性超過低閾值且最大相關性超過中閾值，或最終關心度評分超過3.0。數值越高表示立委涉獵範圍越廣。
+                            </p>
                         </div>
                         <div class="indicator-item">
                             <h4>專業度 (標準化)</h4>
@@ -335,14 +337,44 @@
         <div class="content-panel" id="influence">
             <h2>📊 影響力分析</h2>
 
+            <div class="indicator-explanation">
+                <h3>🎯 影響力指標說明</h3>
+                <div class="indicator-list">
+                    <div class="indicator-item">
+                        <h4>度中心性</h4>
+                        <p>立委在網絡中的直接連接數量，反映立委的直接影響範圍。數值越高表示該立委與更多其他立委有直接互動關係。</p>
+                    </div>
+                    <div class="indicator-item">
+                        <h4>加權度中心性</h4>
+                        <p>考慮連接權重的度中心性，基於立委間的共同會議參與強度計算。權重越高表示立委間的合作關係越密切。</p>
+                    </div>
+                    <div class="indicator-item">
+                        <h4>介數中心性 (會議加權)</h4>
+                        <p>原始介數中心性乘以會議參與權重(log(會議數+1))。衡量立委在網絡中擔任"橋樑"角色的重要性，加權後更重視活躍參與會議的立委。數值越高表示該立委在不同群體間的協調能力越強。</p>
+                    </div>
+                    <div class="indicator-item">
+                        <h4>LeaderRank (會議加權)</h4>
+                        <p>原始LeaderRank分數乘以會議參與權重。這是PageRank算法的改進版本，用於識別網絡中的領導者。加權後更突出在會議中積極參與且具影響力的立委。</p>
+                    </div>
+                    <div class="indicator-item">
+                        <h4>特徵向量中心性 (會議加權)</h4>
+                        <p>原始特徵向量中心性乘以會議參與權重。不僅考慮立委的連接數量，更重視與高影響力立委的連接。加權後更重視在重要會議中活躍的立委網絡。</p>
+                    </div>
+                    <div class="indicator-item">
+                        <h4>核數 (會議加權)</h4>
+                        <p>原始k-core值乘以會議參與權重。反映立委在緊密連接群體中的地位。加權後更突出在核心討論圈中積極參與會議的立委。</p>
+                    </div>
+                </div>
+            </div>
+
             <div class="search-container">
                 <input type="text" class="search-input" id="influence-search" placeholder="搜尋立委...">
                 <select class="filter-select" id="influence-metric">
                     <option value="degree">度中心性</option>
-                    <option value="weighted_degree">加權度中心性</option>
-                    <option value="betweenness">介數中心性</option>
-                    <option value="leaderrank">LeaderRank</option>
-                    <option value="eigenvector">特徵向量中心性</option>
+                    <option value="weighted_degree">度中心性(會議加權)</option>
+                    <option value="betweenness">介數中心性(會議加權)</option>
+                    <option value="leaderrank">LeaderRank(會議加權)</option>
+                    <option value="eigenvector">特徵向量中心性(會議加權)</option>
                 </select>
                 <button class="btn" onclick="filterInfluenceData()">搜尋</button>
                 <button class="btn btn-secondary" onclick="resetInfluenceFilters()">重置</button>
@@ -355,11 +387,11 @@
                             <th class="sortable" data-sort="name">立委姓名</th>
                             <th>政黨</th>
                             <th class="sortable" data-sort="degree">度中心性</th>
-                            <th class="sortable" data-sort="weighted_degree">加權度中心性</th>
-                            <th class="sortable" data-sort="betweenness">介數中心性</th>
-                            <th class="sortable" data-sort="leaderrank">LeaderRank</th>
-                            <th class="sortable" data-sort="eigenvector">特徵向量中心性</th>
-                            <th class="sortable" data-sort="core">核數</th>
+                            <th class="sortable" data-sort="weighted_degree">度中心性<br>(會議加權)</th>
+                            <th class="sortable" data-sort="betweenness">介數中心性<br>(會議加權)</th>
+                            <th class="sortable" data-sort="leaderrank">LeaderRank<br>(會議加權)</th>
+                            <th class="sortable" data-sort="eigenvector">特徵向量中心性<br>(會議加權)</th>
+                            <th class="sortable" data-sort="core">核數<br>(會議加權)</th>
                         </tr>
                     </thead>
                     <tbody id="influence-tbody">
@@ -403,7 +435,29 @@
 
         <!-- 社群分析面板 -->
         <div class="content-panel" id="community">
-            <h2>👥 Louvain社群分析</h2>
+            <h2>👥 社群分析</h2>
+
+            <div class="community-method-controls"
+                style="background: #f8f9fa; padding: 20px; border-radius: 10px; margin-bottom: 20px;">
+                <div id="community-method-status" style="margin-bottom: 15px; font-size: 18px;">
+                    <strong>當前方法：</strong>基於共同出席會議分群
+                </div>
+                <div style="display: flex; gap: 15px; align-items: center;">
+                    <button class="btn" id="community-method-toggle" onclick="toggleCommunityMethod()">
+                        切換到：發言內容分群
+                    </button>
+                    <button class="btn btn-secondary" onclick="reanalyzeCommunities()">
+                        🔄 重新分析
+                    </button>
+                </div>
+                <div style="margin-top: 10px; color: #666; font-size: 16px;">
+                    <strong>方法說明：</strong>
+                    <ul style="margin: 5px 0; padding-left: 20px;">
+                        <li><strong>共同出席會議：</strong>根據立委參與相同會議的頻率進行分群</li>
+                        <li><strong>發言內容相似度：</strong>根據立委發言主題的相似性進行分群</li>
+                    </ul>
+                </div>
+            </div>
 
             <div class="stats-grid">
                 <div class="stat-card">
@@ -429,6 +483,7 @@
                     <thead>
                         <tr>
                             <th class="sortable" data-sort="community">社群ID</th>
+                            <th>分群方法</th>
                             <th class="sortable" data-sort="size">規模</th>
                             <th class="sortable" data-sort="density">密度</th>
                             <th>主要政黨</th>
@@ -438,7 +493,7 @@
                     </thead>
                     <tbody id="community-tbody">
                         <tr>
-                            <td colspan="6" class="loading">載入數據中...</td>
+                            <td colspan="7" class="loading">載入數據中...</td>
                         </tr>
                     </tbody>
                 </table>
