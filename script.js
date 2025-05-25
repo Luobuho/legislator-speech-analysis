@@ -1885,7 +1885,7 @@ function renderCommunityTable(analysis) {
             }).join('');
 
         const density = (Math.random() * 0.5 + 0.3).toFixed(3);
-        const method = community.method || currentCommunityMethod === 'coattendance' ? '共同出席會議' : '發言內容相似度';
+        const method = currentCommunityMethod === 'coattendance' ? '共同出席會議' : '發言內容相似度';
 
         row.innerHTML = `
             <td style="text-align: center; width: 80px;" data-sort-value="${communityId}"><strong>社群 ${communityId}</strong></td>
