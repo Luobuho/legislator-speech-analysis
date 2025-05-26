@@ -73,6 +73,24 @@ async function loadRealData() {
             console.warn('⚠️ 主題立委映射文件未找到，將從基礎數據生成');
         }
 
+        // 7. 嘗試載入會議出席矩陣（用於社群分析）
+        let meetingAttendanceData = [];
+        try {
+            meetingAttendanceData = await loadCSVFile('meeting_attendance_analysis/委員會議出席矩陣.csv');
+            console.log('✅ 會議出席矩陣載入完成:', meetingAttendanceData.length);
+        } catch (e) {
+            console.warn('⚠️ 會議出席矩陣未找到，社群分析將使用主題相似度方法');
+        }
+
+        // 8. 嘗試載入立委主題矩陣（用於主題相似度社群分析）
+        let legislatorTopicMatrixData = [];
+        try {
+            legislatorTopicMatrixData = await loadCSVFile('bertopic_analysis_optimized/legislator_topic_matrix.csv');
+            console.log('✅ 立委主題矩陣載入完成:', legislatorTopicMatrixData.length);
+        } catch (e) {
+            console.warn('⚠️ 立委主題矩陣未找到，將從基礎數據生成');
+        }
+
         // 轉換和整合數據
         console.log('🔄 開始整合數據...');
         const processed = processRealData({
@@ -81,7 +99,9 @@ async function loadRealData() {
             legislatorStats: legislatorStatsData,
             networkAnalysis: networkAnalysisData,
             topicInfo: topicInfoData,
-            topicLegislator: topicLegislatorData
+            topicLegislator: topicLegislatorData,
+            meetingAttendance: meetingAttendanceData,
+            legislatorTopicMatrix: legislatorTopicMatrixData
         });
 
         currentData = {
@@ -101,12 +121,105 @@ async function loadRealData() {
             comprehensiveStats: processComprehensiveStatsWithParty(legislatorStatsData, memberNameMap, memberIdMap)
         };
 
+        // 設置會議數據供社群分析使用 - 這是關鍵修復
+        setupMeetingDataForCommunityAnalysis(legislatorInterestData, meetingAttendanceData);
+
         console.log('✅ 數據整合完成:', currentData);
 
     } catch (error) {
         console.error('載入真實數據失敗:', error);
         throw error;
     }
+}
+
+// 設置會議數據供社群分析使用 - 新增函數
+function setupMeetingDataForCommunityAnalysis(legislatorInterestData, meetingAttendanceData) {
+    console.log('🔄 設置會議數據供社群分析使用...');
+    
+    // 方法1: 嘗試從立委主題關心度數據中提取會議檔案信息
+    if (legislatorInterestData && legislatorInterestData.length > 0) {
+        const documentTopicsData = [];
+        
+        legislatorInterestData.forEach(row => {
+            const name = row['委員姓名'] || row['name'] || row['立委姓名'];
+            const file = row['會議檔案'] || row['file'] || row['文件名'] || row['document'];
+            
+            if (name && file && file !== '') {
+                documentTopicsData.push({
+                    name: name,
+                    file: file
+                });
+            }
+        });
+        
+        if (documentTopicsData.length > 0) {
+            window.documentTopicsData = documentTopicsData;
+            console.log('✅ 從立委主題數據中提取會議信息:', documentTopicsData.length, '條記錄');
+            return;
+        }
+    }
+    
+    // 方法2: 如果有會議出席矩陣，轉換為文檔主題格式
+    if (meetingAttendanceData && meetingAttendanceData.length > 0) {
+        const documentTopicsData = [];
+        
+        meetingAttendanceData.forEach(row => {
+            const legislatorName = row['委員姓名'] || row['name'] || row['立委姓名'];
+            if (!legislatorName) return;
+            
+            // 獲取所有會議列（除了委員姓名列）
+            const meetingColumns = Object.keys(row).filter(col => 
+                col !== '委員姓名' && col !== 'name' && col !== '立委姓名'
+            );
+            
+            // 為每個立委添加其參與的會議
+            meetingColumns.forEach(meeting => {
+                const attended = parseInt(row[meeting]) || 0;
+                if (attended > 0) {
+                    documentTopicsData.push({
+                        name: legislatorName,
+                        file: meeting
+                    });
+                }
+            });
+        });
+        
+        if (documentTopicsData.length > 0) {
+            window.documentTopicsData = documentTopicsData;
+            console.log('✅ 從會議出席矩陣中提取會議信息:', documentTopicsData.length, '條記錄');
+            return;
+        }
+    }
+    
+    // 方法3: 生成基於立委名稱的模擬會議數據（更有意義的模擬）
+    if (currentData && currentData.legislators) {
+        const documentTopicsData = [];
+        
+        currentData.legislators.forEach(legislator => {
+            // 基於立委的政黨和主題生成相關會議
+            const partyMeetings = [`${legislator.party}黨團會議`, `${legislator.party}政策討論會`];
+            const topicMeetings = legislator.topics.slice(0, 5).map((topic, index) => {
+                const topicData = currentData.topics.find(t => t.id === topic.topicId);
+                const topicName = topicData ? topicData.name : `主題${topic.topicId}`;
+                return `${topicName}相關會議`;
+            });
+            
+            const allMeetings = [...partyMeetings, ...topicMeetings];
+            
+            allMeetings.forEach(meeting => {
+                documentTopicsData.push({
+                    name: legislator.name,
+                    file: meeting
+                });
+            });
+        });
+        
+        window.documentTopicsData = documentTopicsData;
+        console.log('✅ 生成基於政黨和主題的模擬會議數據:', documentTopicsData.length, '條記錄');
+        return;
+    }
+    
+    console.warn('⚠️ 無法設置會議數據，社群分析將使用完全隨機的模擬數據');
 }
 
 // 處理主題分數數據並匹配政黨信息
