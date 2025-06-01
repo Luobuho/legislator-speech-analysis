@@ -1,3 +1,5 @@
+/* 原有的 CSS 保持不變，只修改表格相關部分 */
+
 * {
     margin: 0;
     padding: 0;
@@ -107,6 +109,47 @@ body {
     min-height: 0;
 }
 
+/* 新增分析子標籤樣式 */
+.analysis-sub-tabs {
+    display: flex;
+    background: #f8f9fa;
+    border-radius: 8px;
+    padding: 4px;
+    margin-bottom: 20px;
+    border: 1px solid #dee2e6;
+}
+
+.analysis-sub-tab {
+    flex: 1;
+    padding: 10px 20px;
+    text-align: center;
+    background: transparent;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    font-size: 18px;
+    color: #495057;
+}
+
+.analysis-sub-tab:hover {
+    background: #e9ecef;
+}
+
+.analysis-sub-tab.active {
+    background: #28a745;
+    color: white;
+    box-shadow: 0 2px 8px rgba(40, 167, 69, 0.3);
+}
+
+.analysis-sub-panel {
+    display: none;
+}
+
+.analysis-sub-panel.active {
+    display: block;
+}
+
 /* 相關性計算面板特殊樣式 */
 .correlation-sub-tabs {
     display: flex;
@@ -146,6 +189,193 @@ body {
 
 .correlation-sub-panel.active {
     display: block;
+}
+
+/* 基本資料欄位選擇器樣式 */
+.field-selector-container {
+    background: #f8f9fa;
+    border: 1px solid #dee2e6;
+    border-radius: 10px;
+    padding: 20px;
+    margin-bottom: 25px;
+}
+
+.field-selector-container h3 {
+    color: #495057;
+    margin-bottom: 15px;
+    font-size: 1.2em;
+}
+
+.field-checkboxes {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 10px;
+    margin-bottom: 15px;
+}
+
+.field-checkboxes label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 12px;
+    background: white;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    font-size: 16px;
+}
+
+.field-checkboxes label:hover {
+    background: #e3f2fd;
+}
+
+.field-checkboxes input[type="checkbox"] {
+    transform: scale(1.2);
+}
+
+/* 網路圖控制樣式 */
+.network-controls {
+    background: #f8f9fa;
+    border: 1px solid #dee2e6;
+    border-radius: 10px;
+    padding: 20px;
+    margin-bottom: 20px;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 15px;
+    align-items: center;
+}
+
+.control-group {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.control-group label {
+    font-weight: bold;
+    color: #495057;
+    font-size: 14px;
+}
+
+.control-group select,
+.control-group input {
+    padding: 8px 12px;
+    border: 1px solid #ced4da;
+    border-radius: 6px;
+    font-size: 14px;
+}
+
+#threshold-slider {
+    width: 100%;
+}
+
+#threshold-value {
+    font-weight: bold;
+    color: #007bff;
+    font-size: 16px;
+}
+
+.network-stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 15px;
+    margin-bottom: 20px;
+}
+
+#network-container {
+    width: 100%;
+    height: 600px;
+    border: 2px solid #dee2e6;
+    border-radius: 10px;
+    background: #ffffff;
+    position: relative;
+    overflow: hidden;
+}
+
+.network-placeholder {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    color: #6c757d;
+    font-size: 1.1em;
+}
+
+.info-panel {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    width: 250px;
+    background: rgba(255, 255, 255, 0.95);
+    border: 1px solid #dee2e6;
+    border-radius: 8px;
+    padding: 15px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    z-index: 1000;
+}
+
+.info-panel h4 {
+    margin-bottom: 10px;
+    color: #495057;
+    border-bottom: 2px solid #007bff;
+    padding-bottom: 5px;
+}
+
+/* 下任狀態樣式優化 */
+.status-success {
+    color: #28a745;
+    font-weight: bold;
+    background: #d4edda;
+    padding: 3px 8px;
+    border-radius: 4px;
+    font-size: 14px;
+}
+
+.status-failed {
+    color: #dc3545;
+    font-weight: bold;
+    background: #f8d7da;
+    padding: 3px 8px;
+    border-radius: 4px;
+    font-size: 14px;
+}
+
+/* 社群分析成員項目樣式 */
+.member-item {
+    transition: all 0.2s ease;
+}
+
+.member-item:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+}
+
+.education-info {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    margin-top: 4px;
+}
+
+.education-item {
+    font-size: 12px;
+    color: #6c757d;
+    padding: 2px 4px;
+    background: #f8f9fa;
+    border-radius: 3px;
+    text-align: center;
+}
+
+.education-item.university {
+    border-left: 3px solid #007bff;
+    background: #e3f2fd;
+}
+
+.education-item.highest {
+    border-left: 3px solid #28a745;
+    background: #e8f5e8;
 }
 
 .indicator-explanation {
@@ -378,7 +608,7 @@ body {
 .data-table td {
     padding: 14px 12px;
     border-bottom: 1px solid #ddd;
-    vertical-align: top;
+    vertical-align: middle; /* 修改：所有表格內容都上下置中 */
     font-size: 20px;
 }
 
@@ -543,8 +773,8 @@ body {
     min-width: 100px;
 }
 
-#district-topic-table th:nth-child(2),
-#district-topic-table td:nth-child(2) {
+#region-topic-table th:nth-child(2),
+#region-topic-table td:nth-child(2) {
     min-width: 120px;
     width: 140px;
     white-space: nowrap;
@@ -689,10 +919,48 @@ body {
     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
 }
 
+/* 網路圖相關樣式 */
+.network-node {
+    cursor: pointer;
+    stroke-width: 2px;
+}
+
+.network-node.selected {
+    stroke: #ff6b6b;
+    stroke-width: 4px;
+}
+
+.network-link {
+    stroke: #999;
+    stroke-opacity: 0.6;
+}
+
+.network-link.highlighted {
+    stroke: #ff6b6b;
+    stroke-width: 3px;
+    stroke-opacity: 1;
+}
+
+.network-text {
+    font-family: 'Microsoft YaHei', 'Noto Sans TC', Arial, sans-serif;
+    font-size: 12px;
+    text-anchor: middle;
+    pointer-events: none;
+    fill: #333;
+}
+
 /* 響應式設計優化 */
 @media (max-width: 1200px) {
     .indicator-list {
         grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    }
+
+    .field-checkboxes {
+        grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+    }
+
+    .network-controls {
+        grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
     }
 }
 
@@ -744,4 +1012,53 @@ body {
     .meeting-count {
         font-size: 10px;
     }
+
+    .field-checkboxes {
+        grid-template-columns: 1fr;
+    }
+
+    .network-controls {
+        grid-template-columns: 1fr;
+    }
+
+    #network-container {
+        height: 400px;
+    }
+
+    .analysis-sub-tabs {
+        flex-direction: column;
+        gap: 5px;
+    }
+
+    .analysis-sub-tab {
+        font-size: 16px;
+        padding: 8px 15px;
+    }
+}
+
+/* 響應式優化 - 減少手機端卡頓 */
+@media (max-width: 768px) {
+    .education-info {
+        font-size: 11px;
+    }
+    
+    .member-item {
+        font-size: 14px !important;
+        padding: 3px 6px !important;
+    }
+    
+    .topic-tag {
+        font-size: 14px !important;
+        padding: 3px 6px !important;
+    }
+}
+
+/* 性能優化 - 減少重繪 */
+.content-panel {
+    will-change: auto;
+    contain: layout;
+}
+
+.table-container {
+    contain: layout;
 }

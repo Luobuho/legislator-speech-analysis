@@ -42,6 +42,19 @@ function renderLegislatorTable(legislators) {
         const totalScore = legislator.allTopics.reduce((sum, topic) => sum + topic.score, 0);
         const avgScore = legislator.allTopics.length > 0 ? totalScore / legislator.allTopics.length : 0;
 
+        // 建立教育資訊顯示 - 移除"大學: "和"最高: "標籤
+        let educationInfo = '';
+        if (legislator.university) {
+            educationInfo += `<div class="education-item university">${legislator.university}</div>`;
+        }
+        if (legislator.highest) {
+            educationInfo += `<div class="education-item highest">${legislator.highest}</div>`;
+        }
+
+        const nameWithEducation = educationInfo ? 
+            `<div><strong>${legislator.name}</strong></div><div class="education-info">${educationInfo}</div>` : 
+            `<strong>${legislator.name}</strong>`;
+
         const topTopics = legislator.topics.map((topic, index) => {
             const topicData = currentData.topics.find(t => t.id === topic.topicId);
             const fullKeywords = topicData ? topicData.keywords : '';
@@ -70,7 +83,7 @@ function renderLegislatorTable(legislators) {
         }).join('');
 
         row.innerHTML = `
-                            <td style="text-align: center; min-width: 140px;"><strong>${legislator.name}</strong></td>
+                            <td style="text-align: center; min-width: 140px;">${nameWithEducation}</td>
                             <td style="text-align: center; min-width: 100px;"><span class="party-tag party-${legislator.party}">${legislator.party}</span></td>
                             <td style="text-align: center; min-width: 140px;" data-sort-value="${legislator.allTopics.length}"><span class="badge">${legislator.allTopics.length}</span></td>
                             <td style="text-align: center; min-width: 140px;" data-sort-value="${totalScore}">
@@ -110,18 +123,33 @@ function renderTopicTable(topics) {
         const avgScore = topic.legislators.length > 0 ? totalScore / topic.legislators.length : 0;
 
         const allLegislators = topic.legislators.map((leg, index) => {
+            // 獲取立委完整信息以顯示教育背景
+            const legislatorInfo = currentData.legislators.find(l => l.name === leg.legislatorName);
+            let educationTooltip = '';
+            if (legislatorInfo) {
+                if (legislatorInfo.university) educationTooltip += `\\n大學: ${legislatorInfo.university}`;
+                if (legislatorInfo.highest) educationTooltip += `\\n最高: ${legislatorInfo.highest}`;
+            }
+
             return `<span class="legislator-tag"
                                 style="display: inline-block; background: ${getPartyBackgroundColor(leg.party)}; color: white; padding: 4px 8px; margin: 2px; border-radius: 12px; font-size: 20px; cursor: pointer; opacity: 0.9;"
-                                onmouseover="this.style.opacity='1'; showTooltip(event, '${leg.legislatorName} (${leg.party})\\n關心度: ${leg.score.toFixed(3)}\\n排名: ${index + 1}')"
+                                onmouseover="this.style.opacity='1'; showTooltip(event, '${leg.legislatorName} (${leg.party})\\n關心度: ${leg.score.toFixed(3)}\\n排名: ${index + 1}${educationTooltip}')"
                                 onmouseout="this.style.opacity='0.9'; hideTooltip()">
                                 ${leg.legislatorName}
                             </span>`;
         }).join('');
 
         const topTenLegislators = topic.legislators.slice(0, 10).map((leg, index) => {
+            const legislatorInfo = currentData.legislators.find(l => l.name === leg.legislatorName);
+            let educationTooltip = '';
+            if (legislatorInfo) {
+                if (legislatorInfo.university) educationTooltip += `\\n大學: ${legislatorInfo.university}`;
+                if (legislatorInfo.highest) educationTooltip += `\\n最高: ${legislatorInfo.highest}`;
+            }
+
             return `<span class="legislator-tag"
                                 style="display: inline-block; background: ${getPartyBackgroundColor(leg.party)}; color: white; padding: 4px 8px; margin: 2px; border-radius: 12px; font-size: 20px; cursor: pointer; opacity: 0.9; border: 2px solid #ffd700;"
-                                onmouseover="this.style.opacity='1'; showTooltip(event, '${leg.legislatorName} (${leg.party})\\n關心度: ${leg.score.toFixed(3)}\\n排名: ${index + 1}')"
+                                onmouseover="this.style.opacity='1'; showTooltip(event, '${leg.legislatorName} (${leg.party})\\n關心度: ${leg.score.toFixed(3)}\\n排名: ${index + 1}${educationTooltip}')"
                                 onmouseout="this.style.opacity='0.9'; hideTooltip()">
                                 ${leg.legislatorName}
                             </span>`;
@@ -275,52 +303,57 @@ function renderPartyTable(partyData) {
     });
 }
 
-// 載入選區原籍主題數據
-function loadDistrictTopicData() {
+// 載入地區主題數據
+function loadRegionTopicData() {
     if (!currentData || !currentData.legislators) {
         console.error('數據未載入完成');
         return;
     }
 
-    const analysisType = document.getElementById('analysis-type') ? document.getElementById('analysis-type').value : 'district';
+    const analysisType = document.getElementById('region-analysis-type') ? 
+        document.getElementById('region-analysis-type').value : 'eight-district';
 
-    if (analysisType === 'district') {
-        const districtAnalysis = analyzeDistrictTopicRelations();
-        renderDistrictTable(districtAnalysis, '選區');
-    } else {
-        const originAnalysis = analyzeOriginTopicRelations();
-        renderDistrictTable(originAnalysis, '原籍地');
+    let regionAnalysis;
+    let regionTypeName;
+
+    switch (analysisType) {
+        case 'eight-district':
+            regionAnalysis = analyzeEightDistrictTopicRelations();
+            regionTypeName = '八選區';
+            break;
+        case 'seven-origin':
+            regionAnalysis = analyzeSevenOriginTopicRelations();
+            regionTypeName = '七原籍';
+            break;
+        case 'seven-growth':
+            regionAnalysis = analyzeSevenGrowthTopicRelations();
+            regionTypeName = '七成長';
+            break;
+        default:
+            regionAnalysis = analyzeEightDistrictTopicRelations();
+            regionTypeName = '八選區';
     }
+
+    renderRegionTable(regionAnalysis, regionTypeName);
 }
 
-function analyzeDistrictTopicRelations() {
-    const districtData = {};
+function analyzeEightDistrictTopicRelations() {
+    const regionData = {};
 
-    if (!currentData.districts || currentData.districts.length === 0) {
-        console.warn('沒有選區數據，從立委數據中提取');
-        currentData.districts = [...new Set(currentData.legislators.map(leg => leg.district))].filter(district => district && district !== '未知' && district !== '');
+    if (!currentData.eightDistricts || currentData.eightDistricts.length === 0) {
+        console.warn('沒有八選區數據，從立委數據中提取');
+        currentData.eightDistricts = [...new Set(currentData.legislators.map(leg => leg.eightDistrict))].filter(district => district && district !== '未知' && district !== '');
     }
 
-    if (currentData.districts.length === 0) {
-        const mockDistricts = ['台北市', '新北市', '桃園市', '台中市', '台南市', '高雄市'];
-        currentData.districts = mockDistricts;
-
-        currentData.legislators.forEach((legislator, index) => {
-            if (!legislator.district || legislator.district === '未知') {
-                legislator.district = mockDistricts[index % mockDistricts.length];
-            }
-        });
-    }
-
-    currentData.districts.forEach(district => {
-        const districtLegislators = currentData.legislators.filter(leg => leg.district === district);
-
-        if (districtLegislators.length === 0) return;
+    currentData.eightDistricts.forEach(region => {
+        const regionLegislators = currentData.legislators.filter(leg => leg.eightDistrict === region);
+        
+        if (regionLegislators.length === 0) return;
 
         const topicScores = {};
         let totalActivity = 0;
 
-        districtLegislators.forEach(legislator => {
+        regionLegislators.forEach(legislator => {
             legislator.topics.forEach(topic => {
                 if (!topicScores[topic.topicId]) {
                     topicScores[topic.topicId] = 0;
@@ -334,45 +367,34 @@ function analyzeDistrictTopicRelations() {
             .sort(([, a], [, b]) => b - a)
             .slice(0, 10);
 
-        districtData[district] = {
-            legislatorCount: districtLegislators.length,
+        regionData[region] = {
+            legislatorCount: regionLegislators.length,
             topicDiversity: Object.keys(topicScores).length,
             totalActivity: totalActivity,
             topTopics: sortedTopics
         };
     });
 
-    return districtData;
+    return regionData;
 }
 
-function analyzeOriginTopicRelations() {
-    const originData = {};
+function analyzeSevenOriginTopicRelations() {
+    const regionData = {};
 
-    if (!currentData.origins || currentData.origins.length === 0) {
-        console.warn('沒有原籍數據，從立委數據中提取');
-        currentData.origins = [...new Set(currentData.legislators.map(leg => leg.origin))].filter(origin => origin && origin !== '未知' && origin !== '');
+    if (!currentData.sevenOrigins || currentData.sevenOrigins.length === 0) {
+        console.warn('沒有七原籍數據，從立委數據中提取');
+        currentData.sevenOrigins = [...new Set(currentData.legislators.map(leg => leg.sevenOrigin))].filter(origin => origin && origin !== '未知' && origin !== '');
     }
 
-    if (currentData.origins.length === 0) {
-        const mockOrigins = ['台北', '新北', '桃園', '台中', '台南', '高雄', '屏東', '花蓮', '台東'];
-        currentData.origins = mockOrigins;
-
-        currentData.legislators.forEach((legislator, index) => {
-            if (!legislator.origin || legislator.origin === '未知') {
-                legislator.origin = mockOrigins[index % mockOrigins.length];
-            }
-        });
-    }
-
-    currentData.origins.forEach(origin => {
-        const originLegislators = currentData.legislators.filter(leg => leg.origin === origin);
-
-        if (originLegislators.length === 0) return;
+    currentData.sevenOrigins.forEach(region => {
+        const regionLegislators = currentData.legislators.filter(leg => leg.sevenOrigin === region);
+        
+        if (regionLegislators.length === 0) return;
 
         const topicScores = {};
         let totalActivity = 0;
 
-        originLegislators.forEach(legislator => {
+        regionLegislators.forEach(legislator => {
             legislator.topics.forEach(topic => {
                 if (!topicScores[topic.topicId]) {
                     topicScores[topic.topicId] = 0;
@@ -386,27 +408,68 @@ function analyzeOriginTopicRelations() {
             .sort(([, a], [, b]) => b - a)
             .slice(0, 10);
 
-        originData[origin] = {
-            legislatorCount: originLegislators.length,
+        regionData[region] = {
+            legislatorCount: regionLegislators.length,
             topicDiversity: Object.keys(topicScores).length,
             totalActivity: totalActivity,
             topTopics: sortedTopics
         };
     });
 
-    return originData;
+    return regionData;
 }
 
-function renderDistrictTable(districtData, type) {
-    const tbody = document.getElementById('district-topic-tbody');
+function analyzeSevenGrowthTopicRelations() {
+    const regionData = {};
+
+    if (!currentData.sevenGrowths || currentData.sevenGrowths.length === 0) {
+        console.warn('沒有七成長數據，從立委數據中提取');
+        currentData.sevenGrowths = [...new Set(currentData.legislators.map(leg => leg.sevenGrowth))].filter(growth => growth && growth !== '未知' && growth !== '');
+    }
+
+    currentData.sevenGrowths.forEach(region => {
+        const regionLegislators = currentData.legislators.filter(leg => leg.sevenGrowth === region);
+        
+        if (regionLegislators.length === 0) return;
+
+        const topicScores = {};
+        let totalActivity = 0;
+
+        regionLegislators.forEach(legislator => {
+            legislator.topics.forEach(topic => {
+                if (!topicScores[topic.topicId]) {
+                    topicScores[topic.topicId] = 0;
+                }
+                topicScores[topic.topicId] += topic.score;
+                totalActivity += topic.score;
+            });
+        });
+
+        const sortedTopics = Object.entries(topicScores)
+            .sort(([, a], [, b]) => b - a)
+            .slice(0, 10);
+
+        regionData[region] = {
+            legislatorCount: regionLegislators.length,
+            topicDiversity: Object.keys(topicScores).length,
+            totalActivity: totalActivity,
+            topTopics: sortedTopics
+        };
+    });
+
+    return regionData;
+}
+
+function renderRegionTable(regionData, type) {
+    const tbody = document.getElementById('region-topic-tbody');
     tbody.innerHTML = '';
 
-    if (Object.keys(districtData).length === 0) {
+    if (Object.keys(regionData).length === 0) {
         tbody.innerHTML = `<tr><td colspan="6" style="text-align: center; padding: 40px; color: #999;">暫無${type}數據</td></tr>`;
         return;
     }
 
-    Object.entries(districtData).forEach(([location, data]) => {
+    Object.entries(regionData).forEach(([location, data]) => {
         const row = document.createElement('tr');
 
         const topTopics = data.topTopics.map(([topicId, score]) => {
@@ -444,6 +507,158 @@ function renderDistrictTable(districtData, type) {
     });
 }
 
+// 載入基本資料
+function loadBasicInfoData() {
+    if (!currentData.legislators) return;
+
+    populateBasicInfoPartyFilter();
+    
+    // 預設顯示的欄位
+    const defaultFields = ['原始姓名', '政黨', '選區', '原籍'];
+    updateBasicInfoTableHeader(defaultFields);
+    renderBasicInfoTable(currentData.legislators, defaultFields);
+}
+
+function populateBasicInfoPartyFilter() {
+    const partyFilter = document.getElementById('basic-info-party-filter');
+    if (!partyFilter) return;
+    
+    partyFilter.innerHTML = '<option value="">所有政黨</option>';
+
+    currentData.parties.forEach(party => {
+        const option = document.createElement('option');
+        option.value = party;
+        option.textContent = party;
+        partyFilter.appendChild(option);
+    });
+}
+
+function renderBasicInfoTable(legislators, selectedFields) {
+    const tbody = document.getElementById('basic-info-tbody');
+    tbody.innerHTML = '';
+
+    legislators.forEach(legislator => {
+        const row = document.createElement('tr');
+        
+        let rowHtml = '';
+        selectedFields.forEach(field => {
+            let cellContent = '';
+            
+            switch (field) {
+                case '原始姓名':
+                    // 移除學歷顯示文字，只顯示學歷內容
+                    let educationInfo = '';
+                    if (legislator.university) {
+                        educationInfo += `<div class="education-item university">${legislator.university}</div>`;
+                    }
+                    if (legislator.highest) {
+                        educationInfo += `<div class="education-item highest">${legislator.highest}</div>`;
+                    }
+                    
+                    const nameWithEducation = educationInfo ? 
+                        `<div><strong>${legislator.name}</strong></div><div class="education-info">${educationInfo}</div>` : 
+                        `<strong>${legislator.name}</strong>`;
+                    cellContent = nameWithEducation;
+                    break;
+                case '政黨':
+                    cellContent = `<span class="party-tag party-${legislator.party}">${legislator.party}</span>`;
+                    break;
+                case '選區':
+                    // 合併顯示：選區 (八選區)
+                    const district = legislator.district || '無資料';
+                    const eightDistrict = legislator.eightDistrict;
+                    cellContent = eightDistrict && eightDistrict !== '無資料' && eightDistrict !== '未知' ? 
+                        `${district} (${eightDistrict})` : district;
+                    break;
+                case '八選區':
+                    cellContent = legislator.eightDistrict || '無資料';
+                    break;
+                case '原籍':
+                    // 合併顯示：原籍 (七原籍)
+                    const origin = legislator.origin || '無資料';
+                    const sevenOrigin = legislator.sevenOrigin;
+                    cellContent = sevenOrigin && sevenOrigin !== '無資料' && sevenOrigin !== '未知' ? 
+                        `${origin} (${sevenOrigin})` : origin;
+                    break;
+                case '七原籍':
+                    cellContent = legislator.sevenOrigin || '無資料';
+                    break;
+                case '成長':
+                    // 合併顯示：成長地 (七成長)
+                    const growth = legislator.growth || '無資料';
+                    const sevenGrowth = legislator.sevenGrowth;
+                    cellContent = sevenGrowth && sevenGrowth !== '無資料' && sevenGrowth !== '未知' ? 
+                        `${growth} (${sevenGrowth})` : growth;
+                    break;
+                case '七成長':
+                    cellContent = legislator.sevenGrowth || '無資料';
+                    break;
+                case '大學學歷':
+                    cellContent = legislator.university || '';
+                    break;
+                case '最高學歷':
+                    cellContent = legislator.highest || '';
+                    break;
+                case '前職業':
+                    cellContent = legislator.previousJob || '<span style="color: #999; font-style: italic;">多為酬庸職位</span>';
+                    break;
+                case '任期':
+                    const duration = formatTermDuration(legislator.termStart, legislator.termEnd);
+                    cellContent = legislator.termStart && legislator.termEnd ? 
+                        `${legislator.termStart} - ${legislator.termEnd} ${duration}` : '無資料';
+                    break;
+                case '下任':
+                    cellContent = formatNextTermStatusFixed(legislator.nextTerm, legislator.district);
+                    break;
+                case '性別':
+                    cellContent = legislator.gender || '無資料';
+                    break;
+                case '委員會':
+                    cellContent = formatCommitteeInfo(legislator.committees);
+                    break;
+                case '英文名':
+                    cellContent = legislator.englishName || '無資料';
+                    break;
+                default:
+                    cellContent = '無資料';
+            }
+            
+            // 如果內容為空且該欄位有預設隱藏邏輯，則不顯示
+            if ((field === '大學學歷' || field === '最高學歷') && !cellContent) {
+                cellContent = ''; // 空白顯示
+            }
+            
+            rowHtml += `<td style="text-align: center; vertical-align: middle;">${cellContent}</td>`;
+        });
+        
+        row.innerHTML = rowHtml;
+        tbody.appendChild(row);
+    });
+}
+
+// 修復下任狀態格式化函數
+function formatNextTermStatusFixed(status, district) {
+    if (!status || status === '' || status === 'null' || status === 'undefined') {
+        // 檢查是否為不分區立委
+        if (!district || district === '不分區' || district.includes('不分區')) {
+            return '<span class="status-failed">不分區連任失敗</span>';
+        } else {
+            return '<span class="status-failed">資料不完整</span>';
+        }
+    }
+    
+    const lowerStatus = status.toLowerCase();
+    
+    if (lowerStatus === '連任') {
+        return '<span class="status-success">連任</span>';
+    } else if (lowerStatus === '罷免' || lowerStatus === '辭職' || 
+               (lowerStatus !== '連任' && lowerStatus !== '' && lowerStatus !== '未知')) {
+        return `<span class="status-failed">${status}</span>`;
+    } else {
+        return `<span class="status-failed">${status}</span>`;
+    }
+}
+
 // 載入影響力數據
 function loadInfluenceData() {
     if (!currentData || !currentData.legislators) {
@@ -473,8 +688,21 @@ function renderInfluenceTable(legislators) {
             weighted_core: 0
         };
 
+        // 建立教育資訊顯示 - 修改：移除"大學: "和"最高: "標籤
+        let educationInfo = '';
+        if (legislator.university) {
+            educationInfo += `<div class="education-item university">${legislator.university}</div>`;
+        }
+        if (legislator.highest) {
+            educationInfo += `<div class="education-item highest">${legislator.highest}</div>`;
+        }
+
+        const nameWithEducation = educationInfo ? 
+            `<div><strong>${legislator.name}</strong></div><div class="education-info">${educationInfo}</div>` : 
+            `<strong>${legislator.name}</strong>`;
+
         row.innerHTML = `
-            <td style="text-align: center; width: 120px;"><strong>${legislator.name}</strong></td>
+            <td style="text-align: center; width: 120px;">${nameWithEducation}</td>
             <td style="text-align: center; width: 80px;"><span class="party-tag party-${legislator.party}" style="font-size: 20px; padding: 6px 10px;">${legislator.party}</span></td>
             <td style="text-align: center; width: 120px;" data-sort-value="${influence.degree}">
                 <div class="score-bar" style="margin: 0 auto;">
@@ -521,163 +749,6 @@ function renderInfluenceTable(legislators) {
 
         tbody.appendChild(row);
     });
-}
-
-// 載入社群數據 - 修復版本
-async function loadCommunityData() {
-    try {
-        showStatus('🔄 執行Louvain社群檢測...', 'loading');
-        
-        // 使用改進的社群分析函數
-        const communityAnalysis = await analyzeCommunities(currentCommunityMethod);
-        
-        if (communityAnalysis && communityAnalysis.communities) {
-            updateCommunityStats(communityAnalysis);
-            renderCommunityTable(communityAnalysis);
-            showStatus('✅ 社群分析完成！', 'success');
-        } else {
-            throw new Error('社群分析未返回有效結果');
-        }
-    } catch (error) {
-        console.error('載入社群數據失敗:', error);
-        showStatus('❌ 社群數據載入失敗', 'error');
-        
-        // 顯示基本錯誤信息
-        const tbody = document.getElementById('community-tbody');
-        if (tbody) {
-            tbody.innerHTML = `<tr><td colspan="7" style="text-align: center; padding: 40px; color: #d32f2f;">
-                社群分析失敗: ${error.message}<br>
-                <small>請檢查數據完整性或重新載入頁面</small>
-            </td></tr>`;
-        }
-    } finally {
-        setTimeout(() => {
-            const statusIndicator = document.getElementById('status-indicator');
-            if (statusIndicator) {
-                statusIndicator.style.display = 'none';
-            }
-        }, 3000);
-    }
-}
-
-function updateCommunityStats(analysis) {
-    try {
-        document.getElementById('total-communities').textContent = analysis.stats.totalCommunities || 0;
-        document.getElementById('largest-community').textContent = analysis.stats.largestCommunity || 0;
-        document.getElementById('avg-community-size').textContent = (analysis.stats.avgCommunitySize || 0).toFixed(1);
-        document.getElementById('modularity').textContent = (analysis.stats.modularity || 0).toFixed(4);
-    } catch (error) {
-        console.error('更新社群統計失敗:', error);
-    }
-}
-
-// 修復的社群表格渲染函數
-function renderCommunityTable(analysis) {
-    const tbody = document.getElementById('community-tbody');
-    if (!tbody) return;
-    
-    tbody.innerHTML = '';
-
-    if (!analysis || !analysis.communities) {
-        tbody.innerHTML = '<tr><td colspan="7" style="text-align: center; padding: 40px; color: #999;">無社群數據</td></tr>';
-        return;
-    }
-
-    Object.entries(analysis.communities).forEach(([communityId, community]) => {
-        if (!community || !community.members) return;
-
-        const row = document.createElement('tr');
-
-        const partyEntries = Object.entries(community.parties || {}).sort(([, a], [, b]) => b - a);
-        const mainParty = partyEntries[0] ? partyEntries[0][0] : '未知';
-
-        const allMembers = community.members.map(member =>
-            `<span class="member-item" 
-                        style="background-color: ${getPartyBackgroundColor(member.party)}; color: ${getPartyTextColor(member.party)}; padding: 4px 8px; margin: 2px; border-radius: 12px; font-size: 20px; font-weight: 500; display: inline-block; cursor: pointer;"
-                        title="政黨: ${member.party}&#10;選區: ${member.district || '未知'}&#10;原籍: ${member.origin || '未知'}"
-                        onmouseover="showTooltip(event, '立委: ${member.name}\\n政黨: ${member.party}\\n選區: ${member.district || '未知'}\\n原籍: ${member.origin || '未知'}')"
-                        onmouseout="hideTooltip()">
-                        ${member.name}
-                    </span>`
-        ).join('');
-
-        const topTopics = Object.entries(community.topics || {})
-            .sort(([, a], [, b]) => b - a)
-            .slice(0, 8)
-            .map(([topicId, score]) => {
-                const topicData = currentData.topics.find(t => t.id == topicId);
-                const keywords = topicData ? topicData.keywords.split(',').slice(0, 2).join(',') : '';
-                const topicName = topicData ? topicData.name : `主題${topicId}`;
-                return `<span class="topic-tag" 
-                            style="display: inline-block; background: #f0f8ff; border: 1px solid #3498db; padding: 4px 8px; margin: 2px; border-radius: 12px; font-size: 20px; cursor: pointer;"
-                            title="${topicName}: ${keywords}"
-                            onmouseover="showTooltip(event, '${topicName}\\n社群關心度: ${score.toFixed(2)}\\n關鍵詞: ${keywords}')"
-                            onmouseout="hideTooltip()">
-                            ${topicName} (${score.toFixed(1)})
-                        </span>`;
-            }).join('');
-
-        // 計算真實密度 - 安全處理
-        let density = 0;
-        let densityDisplay = '計算中...';
-        
-        try {
-            if (currentAdjacencyMatrix && currentLegislatorIndexMap) {
-                density = calculateCommunityDensity(community.members, currentAdjacencyMatrix, currentLegislatorIndexMap);
-                densityDisplay = density.toFixed(3);
-                console.log(`社群 ${communityId} 密度: ${density.toFixed(3)} (${community.members.length} 個成員)`);
-            } else {
-                // 如果沒有鄰接矩陣，使用簡單估算
-                const memberCount = community.members.length;
-                if (memberCount >= 2) {
-                    // 基於社群大小的簡單密度估算
-                    density = Math.min(1, 2 / (memberCount - 1));
-                    densityDisplay = density.toFixed(3) + '*';
-                } else {
-                    density = 0;
-                    densityDisplay = '0.000';
-                }
-            }
-        } catch (error) {
-            console.warn(`計算社群 ${communityId} 密度時出錯:`, error);
-            density = 0;
-            densityDisplay = 'N/A';
-        }
-
-        const method = currentCommunityMethod === 'coattendance' ? '共同出席會議' : '發言內容相似度';
-
-        row.innerHTML = `
-            <td style="text-align: center; width: 80px;" data-sort-value="${communityId}"><strong>社群 ${communityId}</strong></td>
-            <td style="text-align: center; width: 120px;">${method}</td>
-            <td style="text-align: center; width: 60px;" data-sort-value="${community.members.length}">
-                <span class="badge" style="font-size: 20px;">${community.members.length}</span>
-            </td>
-            <td style="text-align: center; width: 80px;" data-sort-value="${density}" title="密度 = 實際連接數 ÷ 最大可能連接數">
-                <strong>${densityDisplay}</strong>
-                <div style="font-size: 12px; color: #666; margin-top: 2px;">
-                    ${density >= 0.7 ? '高密度' : density >= 0.4 ? '中密度' : '低密度'}
-                </div>
-            </td>
-            <td style="text-align: center; width: 80px;"><span class="party-tag party-${mainParty}" style="font-size: 20px; padding: 6px 10px;">${mainParty}</span></td>
-            <td class="keywords" style="padding: 8px; width: 300px;">
-                <div style="line-height: 1.4; max-height: 120px; overflow-y: auto;">
-                    ${allMembers}
-                </div>
-            </td>
-            <td class="keywords" style="padding: 8px;">
-                <div style="line-height: 1.4;">
-                    ${topTopics}
-                </div>
-            </td>
-        `;
-
-        tbody.appendChild(row);
-    });
-}
-
-function getPartyTextColor(party) {
-    const lightColors = ['未知'];
-    return lightColors.includes(party) ? '#2c3e50' : 'white';
 }
 
 function loadVisualizationTab() {
@@ -800,14 +871,18 @@ function resetTopicFilters() {
     renderTopicTable(currentData.topics);
 }
 
-function filterDistrictData() {
-    loadDistrictTopicData();
+function filterRegionData() {
+    loadRegionTopicData();
 }
 
-function resetDistrictFilters() {
-    document.getElementById('district-search').value = '';
-    document.getElementById('analysis-type').value = 'district';
-    loadDistrictTopicData();
+function resetRegionFilters() {
+    const searchInput = document.getElementById('region-search');
+    const typeSelect = document.getElementById('region-analysis-type');
+    
+    if (searchInput) searchInput.value = '';
+    if (typeSelect) typeSelect.value = 'eight-district';
+    
+    loadRegionTopicData();
 }
 
 function filterInfluenceData() {
@@ -824,4 +899,55 @@ function resetInfluenceFilters() {
     document.getElementById('influence-search').value = '';
     document.getElementById('influence-metric').value = 'degree';
     renderInfluenceTable(currentData.legislators);
+}
+
+// 修改：基本資料篩選功能，包含自動觸發更新顯示
+function filterBasicInfoData() {
+    const searchTerm = document.getElementById('basic-info-search').value.toLowerCase();
+    const selectedParty = document.getElementById('basic-info-party-filter').value;
+
+    let filtered = currentData.legislators.filter(legislator => {
+        const matchesSearch = !searchTerm || legislator.name.toLowerCase().includes(searchTerm);
+        const matchesParty = !selectedParty || legislator.party === selectedParty;
+        return matchesSearch && matchesParty;
+    });
+
+    // 取得當前選中的欄位
+    const selectedFields = [];
+    const checkboxes = document.querySelectorAll('.field-checkboxes input[type="checkbox"]:checked');
+    checkboxes.forEach(checkbox => {
+        selectedFields.push(checkbox.value);
+    });
+
+    // 如果沒有選中任何欄位，使用預設欄位
+    if (selectedFields.length === 0) {
+        selectedFields.push('原始姓名', '政黨', '選區', '原籍');
+        
+        // 同時更新複選框狀態
+        checkboxes.forEach(checkbox => {
+            checkbox.checked = selectedFields.includes(checkbox.value);
+        });
+        
+        // 更新表頭
+        updateBasicInfoTableHeader(selectedFields);
+    }
+
+    renderBasicInfoTable(filtered, selectedFields);
+}
+
+// 修改：基本資料重置功能，包含自動觸發更新顯示
+function resetBasicInfoFilters() {
+    document.getElementById('basic-info-search').value = '';
+    document.getElementById('basic-info-party-filter').value = '';
+    
+    // 重置為預設欄位
+    const checkboxes = document.querySelectorAll('.field-checkboxes input[type="checkbox"]');
+    const defaultFields = ['原始姓名', '政黨', '選區', '原籍'];
+    
+    checkboxes.forEach(checkbox => {
+        checkbox.checked = defaultFields.includes(checkbox.value);
+    });
+    
+    // 自動觸發更新顯示
+    updateBasicInfoDisplay();
 }

@@ -1,4 +1,4 @@
-// community-analysis.js - 改進的社群分析模塊
+// community-analysis.js - 改進的社群分析模塊新版
 
 let currentCommunityMethod = 'topic-similarity'; // 預設使用主題相似度方法
 let currentAdjacencyMatrix = null;

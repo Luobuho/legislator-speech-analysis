@@ -1,4 +1,4 @@
-// data-processing.js - 數據處理模塊
+// data-processing.js - 數據處理模塊 (移除虛假數據生成)
 
 // 載入真實數據
 async function loadRealData() {
@@ -6,7 +6,7 @@ async function loadRealData() {
         // 載入各個分析結果文件
         console.log('開始載入分析結果文件...');
 
-        // 1. 首先載入委員ID對應表（最重要）
+        // 1. 首先載入委員ID對應表（最重要）- 修復Big-5編碼問題
         let memberMappingData = [];
         const possiblePaths = [
             '委員ID對應表.csv',
@@ -18,7 +18,7 @@ async function loadRealData() {
 
         for (const path of possiblePaths) {
             try {
-                memberMappingData = await loadCSVFile(path);
+                memberMappingData = await loadCSVFileWithEncoding(path, 'big5');
                 console.log(`✅ 委員ID對應表載入成功: ${path}, 共 ${memberMappingData.length} 條記錄`);
 
                 if (memberMappingData.length > 0) {
@@ -73,13 +73,27 @@ async function loadRealData() {
             console.warn('⚠️ 主題立委映射文件未找到，將從基礎數據生成');
         }
 
-        // 7. 嘗試載入會議出席矩陣（用於社群分析）
+        // 7. 載入會議出席矩陣（用於社群分析和網路分析）
         let meetingAttendanceData = [];
         try {
             meetingAttendanceData = await loadCSVFile('meeting_attendance_analysis/委員會議出席矩陣.csv');
             console.log('✅ 會議出席矩陣載入完成:', meetingAttendanceData.length);
+            
+            if (meetingAttendanceData.length > 0) {
+                console.log('會議出席矩陣欄位:', Object.keys(meetingAttendanceData[0]));
+                console.log('前3條記錄示例:', meetingAttendanceData.slice(0, 3));
+                
+                // 分析會議數據結構
+                const firstRow = meetingAttendanceData[0];
+                const meetingColumns = Object.keys(firstRow).filter(col => 
+                    col !== '委員姓名' && col !== 'name' && col !== '立委姓名' && 
+                    col !== '委員ID' && col !== 'id' && col !== 'ID'
+                );
+                console.log(`發現 ${meetingColumns.length} 個會議欄位:`, meetingColumns.slice(0, 5));
+            }
         } catch (e) {
-            console.warn('⚠️ 會議出席矩陣未找到，社群分析將使用主題相似度方法');
+            console.warn('⚠️ 會議出席矩陣未找到，相關分析功能將不可用');
+            console.warn('錯誤詳情:', e.message);
         }
 
         // 8. 嘗試載入立委主題矩陣（用於主題相似度社群分析）
@@ -109,7 +123,10 @@ async function loadRealData() {
             topics: processed.topics,
             parties: processed.parties,
             districts: processed.districts,
-            origins: processed.origins
+            origins: processed.origins,
+            eightDistricts: processed.eightDistricts,
+            sevenOrigins: processed.sevenOrigins,
+            sevenGrowths: processed.sevenGrowths
         };
 
         const memberNameMap = processed.memberNameMap;
@@ -121,7 +138,7 @@ async function loadRealData() {
             comprehensiveStats: processComprehensiveStatsWithParty(legislatorStatsData, memberNameMap, memberIdMap)
         };
 
-        // 設置會議數據供社群分析使用 - 這是關鍵修復
+        // 設置會議數據供社群分析和網路分析使用
         setupMeetingDataForCommunityAnalysis(legislatorInterestData, meetingAttendanceData);
 
         console.log('✅ 數據整合完成:', currentData);
@@ -132,12 +149,142 @@ async function loadRealData() {
     }
 }
 
-// 設置會議數據供社群分析使用 - 新增函數
+// 新增：支持不同編碼的CSV載入函數
+async function loadCSVFileWithEncoding(filePath, encoding = 'utf-8') {
+    try {
+        console.log(`正在載入檔案: ${filePath} (編碼: ${encoding})`);
+
+        let text;
+        
+        if (typeof window.fs !== 'undefined' && window.fs.readFile) {
+            try {
+                if (encoding.toLowerCase() === 'big5') {
+                    // 以二進制方式讀取文件
+                    const buffer = await window.fs.readFile(filePath);
+                    // 使用TextDecoder解碼Big-5
+                    const decoder = new TextDecoder('big5');
+                    text = decoder.decode(buffer);
+                } else {
+                    text = await window.fs.readFile(filePath, { encoding: 'utf8' });
+                }
+                console.log(`使用 window.fs.readFile 讀取成功: ${filePath}`);
+            } catch (fsError) {
+                console.log(`window.fs.readFile 失敗，嘗試使用 fetch: ${fsError.message}`);
+                throw fsError;
+            }
+        }
+        
+        if (!text) {
+            const response = await fetch(filePath);
+            if (!response.ok) {
+                throw new Error(`HTTP error ${response.status}: ${response.statusText}`);
+            }
+
+            if (encoding.toLowerCase() === 'big5') {
+                // 獲取ArrayBuffer並用TextDecoder解碼
+                const buffer = await response.arrayBuffer();
+                const decoder = new TextDecoder('big5');
+                text = decoder.decode(buffer);
+            } else {
+                text = await response.text();
+            }
+            
+            console.log(`使用 fetch 讀取成功: ${filePath}，大小: ${text.length} 字符`);
+        }
+
+        return parseCSV(text);
+
+    } catch (error) {
+        console.error(`無法讀取 CSV 檔案 ${filePath}:`, error);
+        throw error;
+    }
+}
+
+// 設置會議數據供社群分析使用 - 修改：移除虛假數據生成
 function setupMeetingDataForCommunityAnalysis(legislatorInterestData, meetingAttendanceData) {
-    console.log('🔄 設置會議數據供社群分析使用...');
+    console.log('🔄 設置會議數據供社群分析和網路分析使用...');
     
-    // 方法1: 嘗試從立委主題關心度數據中提取會議檔案信息
+    // 方法1: 使用會議出席矩陣數據（優先選擇）
+    if (meetingAttendanceData && meetingAttendanceData.length > 0) {
+        console.log('✅ 使用真實會議出席矩陣數據');
+        
+        // 處理會議出席矩陣並生成文檔主題格式數據
+        const documentTopicsData = [];
+        const meetingAttendanceMap = new Map();
+        
+        meetingAttendanceData.forEach(row => {
+            const legislatorName = row['委員姓名'] || row['name'] || row['立委姓名'] || row['委員'] || row['legislator'];
+            if (!legislatorName || legislatorName.trim() === '') return;
+            
+            const cleanLegislatorName = legislatorName.trim();
+            
+            // 獲取所有會議列（除了立委姓名相關的列）
+            const meetingColumns = Object.keys(row).filter(col => 
+                col !== '委員姓名' && col !== 'name' && col !== '立委姓名' && 
+                col !== '委員' && col !== 'legislator' && col !== '委員ID' && 
+                col !== 'id' && col !== 'ID' && col !== 'index'
+            );
+            
+            // 建立立委的會議參與列表
+            const attendedMeetings = new Set();
+            
+            meetingColumns.forEach(meeting => {
+                const attended = row[meeting];
+                // 更寬鬆的出席判定：只要不是0、空值、null、undefined就算出席
+                if (attended && attended !== '0' && attended !== 0 && 
+                    attended !== '' && attended !== 'null' && attended !== 'undefined') {
+                    attendedMeetings.add(meeting);
+                    
+                    // 同時添加到documentTopicsData格式
+                    documentTopicsData.push({
+                        name: cleanLegislatorName,
+                        file: meeting
+                    });
+                }
+            });
+            
+            // 保存到會議出席映射
+            if (attendedMeetings.size > 0) {
+                meetingAttendanceMap.set(cleanLegislatorName, attendedMeetings);
+            }
+            
+            if (meetingColumns.length > 0) {
+                console.log(`立委 ${cleanLegislatorName} 參與了 ${attendedMeetings.size}/${meetingColumns.length} 個會議`);
+            }
+        });
+        
+        // 設置全域變量
+        window.documentTopicsData = documentTopicsData;
+        window.meetingAttendanceMap = meetingAttendanceMap;
+        
+        // 計算統計信息
+        const totalLegislators = meetingAttendanceMap.size;
+        const totalMeetings = new Set(documentTopicsData.map(d => d.file)).size;
+        const totalConnections = documentTopicsData.length;
+        
+        console.log(`✅ 會議出席數據處理完成:`);
+        console.log(`  - 立委數量: ${totalLegislators}`);
+        console.log(`  - 會議數量: ${totalMeetings}`);
+        console.log(`  - 總出席記錄: ${totalConnections}`);
+        console.log(`  - 平均每位立委參與會議數: ${(totalConnections / totalLegislators).toFixed(1)}`);
+        
+        // 分析會議出席分布
+        const attendanceCounts = Array.from(meetingAttendanceMap.values()).map(meetings => meetings.size);
+        if (attendanceCounts.length > 0) {
+            const maxAttendance = Math.max(...attendanceCounts);
+            const minAttendance = Math.min(...attendanceCounts);
+            const avgAttendance = attendanceCounts.reduce((sum, count) => sum + count, 0) / attendanceCounts.length;
+            
+            console.log(`  - 會議參與分布: 最多 ${maxAttendance}, 最少 ${minAttendance}, 平均 ${avgAttendance.toFixed(1)}`);
+        }
+        
+        return;
+    }
+    
+    // 方法2: 嘗試從立委主題關心度數據中提取會議檔案信息
     if (legislatorInterestData && legislatorInterestData.length > 0) {
+        console.log('⚠️ 會議出席矩陣不可用，嘗試從主題關心度數據提取會議信息');
+        
         const documentTopicsData = [];
         
         legislatorInterestData.forEach(row => {
@@ -146,7 +293,7 @@ function setupMeetingDataForCommunityAnalysis(legislatorInterestData, meetingAtt
             
             if (name && file && file !== '') {
                 documentTopicsData.push({
-                    name: name,
+                    name: name.trim(),
                     file: file
                 });
             }
@@ -159,67 +306,15 @@ function setupMeetingDataForCommunityAnalysis(legislatorInterestData, meetingAtt
         }
     }
     
-    // 方法2: 如果有會議出席矩陣，轉換為文檔主題格式
-    if (meetingAttendanceData && meetingAttendanceData.length > 0) {
-        const documentTopicsData = [];
-        
-        meetingAttendanceData.forEach(row => {
-            const legislatorName = row['委員姓名'] || row['name'] || row['立委姓名'];
-            if (!legislatorName) return;
-            
-            // 獲取所有會議列（除了委員姓名列）
-            const meetingColumns = Object.keys(row).filter(col => 
-                col !== '委員姓名' && col !== 'name' && col !== '立委姓名'
-            );
-            
-            // 為每個立委添加其參與的會議
-            meetingColumns.forEach(meeting => {
-                const attended = parseInt(row[meeting]) || 0;
-                if (attended > 0) {
-                    documentTopicsData.push({
-                        name: legislatorName,
-                        file: meeting
-                    });
-                }
-            });
-        });
-        
-        if (documentTopicsData.length > 0) {
-            window.documentTopicsData = documentTopicsData;
-            console.log('✅ 從會議出席矩陣中提取會議信息:', documentTopicsData.length, '條記錄');
-            return;
-        }
-    }
+    // 如果所有真實數據都不可用，不生成任何虛假數據
+    console.warn('❌ 無法獲取會議出席數據，網路分析和社群分析的共同會議功能將不可用');
+    console.warn('請確保以下文件之一存在並可讀取:');
+    console.warn('  - meeting_attendance_analysis/委員會議出席矩陣.csv');
+    console.warn('  - 主題關心度數據中包含會議檔案信息');
     
-    // 方法3: 生成基於立委名稱的模擬會議數據（更有意義的模擬）
-    if (currentData && currentData.legislators) {
-        const documentTopicsData = [];
-        
-        currentData.legislators.forEach(legislator => {
-            // 基於立委的政黨和主題生成相關會議
-            const partyMeetings = [`${legislator.party}黨團會議`, `${legislator.party}政策討論會`];
-            const topicMeetings = legislator.topics.slice(0, 5).map((topic, index) => {
-                const topicData = currentData.topics.find(t => t.id === topic.topicId);
-                const topicName = topicData ? topicData.name : `主題${topic.topicId}`;
-                return `${topicName}相關會議`;
-            });
-            
-            const allMeetings = [...partyMeetings, ...topicMeetings];
-            
-            allMeetings.forEach(meeting => {
-                documentTopicsData.push({
-                    name: legislator.name,
-                    file: meeting
-                });
-            });
-        });
-        
-        window.documentTopicsData = documentTopicsData;
-        console.log('✅ 生成基於政黨和主題的模擬會議數據:', documentTopicsData.length, '條記錄');
-        return;
-    }
-    
-    console.warn('⚠️ 無法設置會議數據，社群分析將使用完全隨機的模擬數據');
+    // 設置空的全域變量
+    window.documentTopicsData = [];
+    window.meetingAttendanceMap = new Map();
 }
 
 // 處理主題分數數據並匹配政黨信息
@@ -292,11 +387,11 @@ function processComprehensiveStatsWithParty(comprehensiveStatsData, memberNameMa
     });
 }
 
-// 處理真實數據（簡化版，保持原有邏輯）
+// 處理真實數據（增強版，支持新欄位）
 function processRealData(rawData) {
     console.log('開始處理真實數據...');
 
-    // 建立委員ID映射
+    // 建立委員ID映射（支持新的欄位結構）
     const memberIdMap = new Map();
     const memberNameMap = new Map();
 
@@ -306,7 +401,20 @@ function processRealData(rawData) {
             const realName = row['原始姓名'] || row['real_name'] || row['name'] || row['姓名'] || row['委員姓名'];
             const party = row['政黨'] || row['party'] || row['Party'] || row['政党'];
             const district = row['選區'] || row['district'] || row['District'];
+            const eightDistrict = row['八選區'] || row['eight_district'];
             const origin = row['原籍'] || row['origin'] || row['出生地'];
+            const sevenOrigin = row['七原籍'] || row['seven_origin'];
+            const growth = row['成長'] || row['growth'] || row['成長地'];
+            const sevenGrowth = row['七成長'] || row['seven_growth'];
+            const university = row['大學學歷'] || row['university'] || row['大學'];
+            const highest = row['最高學歷'] || row['highest'] || row['最高'];
+            const previousJob = row['前職業'] || row['previous_job'] || row['職業'];
+            const termStart = row['任期起'] || row['term_start'];
+            const termEnd = row['任期迄'] || row['term_end'];
+            const nextTerm = row['下任'] || row['next_term'];
+            const gender = row['性別'] || row['gender'];
+            const committees = row['委員會'] || row['committees'];
+            const englishName = row['英文名'] || row['english_name'];
 
             if (realName) {
                 const memberInfo = {
@@ -314,7 +422,20 @@ function processRealData(rawData) {
                     realName: realName,
                     party: party || '未知',
                     district: district || '未知',
-                    origin: origin || '未知'
+                    eightDistrict: eightDistrict || '未知',
+                    origin: origin || '未知',
+                    sevenOrigin: sevenOrigin || '未知',
+                    growth: growth || '未知',
+                    sevenGrowth: sevenGrowth || '未知',
+                    university: university || '',
+                    highest: highest || '',
+                    previousJob: previousJob || '',
+                    termStart: termStart || '',
+                    termEnd: termEnd || '',
+                    nextTerm: nextTerm || '',
+                    gender: gender || '',
+                    committees: committees || '',
+                    englishName: englishName || ''
                 };
 
                 if (memberId) {
@@ -375,7 +496,20 @@ function processRealData(rawData) {
                 realName: legislatorId,
                 party: '未知',
                 district: '未知',
-                origin: '未知'
+                eightDistrict: '未知',
+                origin: '未知',
+                sevenOrigin: '未知',
+                growth: '未知',
+                sevenGrowth: '未知',
+                university: '',
+                highest: '',
+                previousJob: '',
+                termStart: '',
+                termEnd: '',
+                nextTerm: '',
+                gender: '',
+                committees: '',
+                englishName: ''
             };
 
             const legislatorName = memberInfo.realName;
@@ -386,7 +520,20 @@ function processRealData(rawData) {
                     name: legislatorName,
                     party: memberInfo.party,
                     district: memberInfo.district,
+                    eightDistrict: memberInfo.eightDistrict,
                     origin: memberInfo.origin,
+                    sevenOrigin: memberInfo.sevenOrigin,
+                    growth: memberInfo.growth,
+                    sevenGrowth: memberInfo.sevenGrowth,
+                    university: memberInfo.university,
+                    highest: memberInfo.highest,
+                    previousJob: memberInfo.previousJob,
+                    termStart: memberInfo.termStart,
+                    termEnd: memberInfo.termEnd,
+                    nextTerm: memberInfo.nextTerm,
+                    gender: memberInfo.gender,
+                    committees: memberInfo.committees,
+                    englishName: memberInfo.englishName,
                     topics: [],
                     allTopics: [],
                     influence: {
@@ -486,11 +633,17 @@ function processRealData(rawData) {
     const parties = [...new Set(legislators.map(leg => leg.party))].filter(p => p && p !== '未知');
     const districts = [...new Set(legislators.map(leg => leg.district))].filter(d => d && d !== '未知');
     const origins = [...new Set(legislators.map(leg => leg.origin))].filter(o => o && o !== '未知');
+    const eightDistricts = [...new Set(legislators.map(leg => leg.eightDistrict))].filter(d => d && d !== '未知');
+    const sevenOrigins = [...new Set(legislators.map(leg => leg.sevenOrigin))].filter(o => o && o !== '未知');
+    const sevenGrowths = [...new Set(legislators.map(leg => leg.sevenGrowth))].filter(g => g && g !== '未知');
 
     console.log('數據處理統計:');
     console.log('- 立委數量:', legislators.length);
     console.log('- 主題數量:', topics.length);
     console.log('- 政黨數量:', parties.length);
+    console.log('- 八選區數量:', eightDistricts.length);
+    console.log('- 七原籍數量:', sevenOrigins.length);
+    console.log('- 七成長數量:', sevenGrowths.length);
 
     return {
         legislators: legislators,
@@ -498,166 +651,15 @@ function processRealData(rawData) {
         parties: parties,
         districts: districts,
         origins: origins,
+        eightDistricts: eightDistricts,
+        sevenOrigins: sevenOrigins,
+        sevenGrowths: sevenGrowths,
         memberNameMap: memberNameMap,
         memberIdMap: memberIdMap
     };
 }
 
-// 生成模擬數據（作為備案）
-function generateMockData() {
-    console.log('生成模擬數據...');
-
-    const parties = ['民進黨', '國民黨', '時代力量', '親民黨', '民眾黨', '無黨籍'];
-    const districts = ['台北市', '新北市', '桃園市', '台中市', '台南市', '高雄市'];
-    const origins = ['台北', '新北', '桃園', '台中', '台南', '高雄'];
-
-    // 生成立委數據
-    const legislators = [];
-    for (let i = 1; i <= 113; i++) {
-        const party = parties[Math.floor(Math.random() * parties.length)];
-        const district = districts[Math.floor(Math.random() * districts.length)];
-        const origin = origins[Math.floor(Math.random() * origins.length)];
-
-        const numTopics = Math.floor(Math.random() * 30) + 10;
-        const allTopics = [];
-        const topTopics = [];
-
-        for (let j = 0; j < numTopics; j++) {
-            const topicData = {
-                topicId: Math.floor(Math.random() * 175) + 1,
-                score: Math.random() * 10
-            };
-            allTopics.push(topicData);
-        }
-
-        allTopics.sort((a, b) => b.score - a.score);
-
-        for (let k = 0; k < Math.min(10, allTopics.length); k++) {
-            topTopics.push({
-                ...allTopics[k],
-                rank: k + 1
-            });
-        }
-
-        legislators.push({
-            id: `立委${i}`,
-            name: `立委${i}`,
-            party: party,
-            district: district,
-            origin: origin,
-            topics: topTopics,
-            allTopics: allTopics,
-            influence: {
-                degree: Math.random(),
-                weighted_degree: Math.random(),
-                betweenness: Math.random(),
-                leaderrank: Math.random(),
-                eigenvector: Math.random(),
-                core: Math.floor(Math.random() * 10) + 1
-            },
-            community: Math.floor(Math.random() * 8) + 1
-        });
-    }
-
-    // 生成主題數據
-    const topics = [];
-    for (let i = 1; i <= 175; i++) {
-        const keywords = ['經濟發展', '教育政策', '醫療健康', '交通建設', '環境保護'].slice(0, Math.floor(Math.random() * 5) + 1).join(', ');
-
-        topics.push({
-            id: i,
-            keywords: keywords,
-            keywordList: keywords.split(', '),
-            legislators: generateLegislatorScores(legislators)
-        });
-    }
-
-    // 生成模擬相關性數據
-    correlationData = {
-        topicScores: generateMockTopicScores(legislators, topics),
-        comprehensiveStats: generateMockComprehensiveStats(legislators)
-    };
-
-    return {
-        legislators: legislators,
-        topics: topics,
-        parties: parties,
-        districts: districts,
-        origins: origins
-    };
-}
-
-function generateLegislatorScores(legislators) {
-    const scores = [];
-    const numLegislators = Math.floor(Math.random() * 20) + 5;
-
-    for (let i = 0; i < numLegislators; i++) {
-        const legislator = legislators[Math.floor(Math.random() * legislators.length)];
-        scores.push({
-            legislatorName: legislator.name,
-            party: legislator.party,
-            score: Math.random() * 10,
-            rank: i + 1
-        });
-    }
-
-    return scores.sort((a, b) => b.score - a.score);
-}
-
-function generateMockTopicScores(legislators, topics) {
-    const topicScores = [];
-
-    legislators.forEach(legislator => {
-        const numTopics = Math.floor(Math.random() * 20) + 5;
-        for (let i = 0; i < numTopics; i++) {
-            const topic = topics[Math.floor(Math.random() * topics.length)];
-            topicScores.push({
-                '委員姓名': legislator.name,
-                '政黨': legislator.party,
-                '主題ID': topic.id,
-                '直接發言次數': Math.floor(Math.random() * 10) + 1,
-                '低相關發言次數': Math.floor(Math.random() * 15) + 5,
-                '中相關發言次數': Math.floor(Math.random() * 10) + 2,
-                '高相關發言次數': Math.floor(Math.random() * 5) + 1,
-                '平均相關性': Math.random() * 0.1,
-                '最大相關性': Math.random() * 0.2 + 0.1,
-                '總相關性': Math.random() * 2 + 0.5,
-                '最終關心度評分': Math.random() * 15 + 2
-            });
-        }
-    });
-
-    return topicScores;
-}
-
-function generateMockComprehensiveStats(legislators) {
-    const comprehensiveStats = [];
-
-    legislators.forEach(legislator => {
-        const topicCount = Math.floor(Math.random() * 25) + 10;
-        const totalFinalScore = Math.random() * 200 + 50;
-        const totalDirectSpeeches = Math.floor(Math.random() * 100) + 20;
-        const totalSpeeches = totalDirectSpeeches + Math.floor(Math.random() * 150) + 50;
-
-        comprehensiveStats.push({
-            '委員姓名': legislator.name,
-            '政黨': legislator.party,
-            '總最終關心度': totalFinalScore,
-            '平均最終關心度': totalFinalScore / topicCount,
-            '關注主題數': topicCount,
-            '總直接發言': totalDirectSpeeches,
-            '總發言次數': totalSpeeches,
-            '專業度': totalFinalScore / topicCount,
-            '發言效率': totalFinalScore / totalSpeeches,
-            '直接參與率': totalDirectSpeeches / totalSpeeches,
-            '平均相關性': Math.random() * 0.1 + 0.02
-        });
-    });
-
-    return comprehensiveStats;
-}
-
-// 文件讀取函數
+// 文件讀取函數（保持不變）
 async function loadCSVFile(filePath) {
     try {
         console.log(`正在載入檔案: ${filePath}`);
